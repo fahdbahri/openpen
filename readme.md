@@ -4,12 +4,12 @@ AI-powered lecture/meeting assistant with live transcription, smart notes, and c
 
 ## Features
 
-- 🎙️ **Live transcription** via Groq Whisper (mic only)
-- 🤖 **AI Chat** with full lecture context (Summarize, Explain, Quiz, Key Points)
-- 📝 **Rich notes editor** (Bold / Italic)
-- 📄 **PDF export** — transcription, notes, and chat history
-- 🔝 **Always-on-top overlay** — thin 32px bar, dropdown panels
-- ⚡ Fast Python backend (Groq LLM + Whisper)
+- **Live transcription** via Groq Whisper (mic only)
+- **AI Chat** with full lecture context (Summarize, Explain, Quiz, Key Points)
+- **Rich notes editor** (Bold / Italic)
+- **PDF export** — transcription, notes, and chat history
+- **Always-on-top overlay** — thin 32px bar, dropdown panels
+- Fast Python backend (Groq LLM + Whisper)
 
 ## Quick Start
 
