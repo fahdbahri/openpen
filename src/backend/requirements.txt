@@ -1,3 +1,7 @@
 fastapi
 uvicorn
 pydantic
+python-socketio
+python-dotenv
+groq
+numpy

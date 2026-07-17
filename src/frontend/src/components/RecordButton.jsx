@@ -1,9 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { Mic, StopCircle } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import { Mic, StopCircle, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
 import speechToTextUtils from "../TranscribeUtilities";
 
-export function RecordButton({ onTranscriptionUpdate, onSummaryUpdate, onTabChange }) {
+export function RecordButton({
+  onTranscriptionUpdate,
+  onInterimUpdate,
+  onRecordingStateChange,
+  onSummarize,
+  getFullTranscript,
+}) {
   const [isRecording, setIsRecording] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
   const [interimTranscribedData, setInterimTranscribedData] = useState("");
@@ -12,10 +18,11 @@ export function RecordButton({ onTranscriptionUpdate, onSummaryUpdate, onTabChan
   function handleDataReceived(data, isFinal) {
     if (isFinal) {
       setInterimTranscribedData("");
-      setCompleteTranscript((oldTranscript) => [...oldTranscript, data]); // Add final transcription to complete transcript
-      onTranscriptionUpdate((oldData) => [...oldData, data]); // Pass final transcription to parent
+      setCompleteTranscript((old) => [...old, data]);
+      onTranscriptionUpdate((oldData) => [...oldData, data]);
     } else {
       setInterimTranscribedData(data);
+      onInterimUpdate(data);
     }
   }
 
@@ -30,52 +37,9 @@ export function RecordButton({ onTranscriptionUpdate, onSummaryUpdate, onTabChan
     };
   }
 
-  function getFullTranscription() {
-    return completeTranscript.join(" "); // Join the complete transcript
-  }
-
-  const handleSummarize = async () => {
-    try {
-      onTabChange("summary");
-      const fullText = getFullTranscription();
-
-      console.log("Full summarization", fullText);
-
-      const response = await fetch("http://0.0.0.0:10000/summary", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: fullText,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const summaryData = await response.json();
-      console.log("Summary Data Received", summaryData);
-
-      const summary =
-        summaryData.summary || // Direct summary
-        (summaryData.can_summarize
-          ? summaryData.message
-          : "No summary available");
-
-      if (typeof summary === "string" && summary.trim()) {
-        onSummaryUpdate(summary);
-      } else {
-        console.warn("Received invalid summary:", summaryData);
-      }
-    } catch (error) {
-      console.log("Error generating a summary: ", error);
-    }
-  };
-
   function onStart() {
     setIsRecording(true);
+    onRecordingStateChange(true);
     speechToTextUtils.initRecording(
       getTranscriptionConfig(),
       handleDataReceived,
@@ -87,30 +51,42 @@ export function RecordButton({ onTranscriptionUpdate, onSummaryUpdate, onTabChan
 
   function onStop() {
     setIsRecording(false);
+    onRecordingStateChange(false);
+    onInterimUpdate("");
     speechToTextUtils.stopRecording();
 
-    // Add the interim transcribed data to the complete transcript
     if (interimTranscribedData) {
-      setCompleteTranscript((oldTranscript) => [...oldTranscript, interimTranscribedData]);
-      setInterimTranscribedData(""); // Clear the interim data after adding it to the complete transcript
+      setCompleteTranscript((old) => [...old, interimTranscribedData]);
+      onTranscriptionUpdate((oldData) => [...oldData, interimTranscribedData]);
+      setInterimTranscribedData("");
     }
   }
 
   return (
-    <div className="flex space-x-4 items-center">
+    <div className="flex items-center gap-2">
       <Button
         onClick={isRecording ? onStop : onStart}
         variant={isRecording ? "destructive" : "default"}
+        size="sm"
+        className="text-xs"
       >
         {isRecording ? (
-          <StopCircle className="mr-2 h-4 w-4" />
+          <StopCircle className="mr-1 h-3 w-3" />
         ) : (
-          <Mic className="mr-2 h-4 w-4" />
+          <Mic className="mr-1 h-3 w-3" />
         )}
-        {isRecording ? "Stop Recording" : "Start Recording"}
+        {isRecording ? "Stop" : "Record"}
       </Button>
 
-      <Button onClick={handleSummarize}>Summarize</Button>
+      <Button
+        onClick={onSummarize}
+        size="sm"
+        variant="secondary"
+        className="text-xs"
+      >
+        <Sparkles className="mr-1 h-3 w-3" />
+        Summarize
+      </Button>
     </div>
   );
 }

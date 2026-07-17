@@ -6,66 +6,110 @@
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.9);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: transparent !important;
+  overflow: hidden;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+#root {
+  min-height: 100vh;
+  background: transparent;
+}
+
+button, input, select, textarea, .interactive {
+  -webkit-app-region: no-drag;
+}
+
+.liquid-glass {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.liquid-glass-bar {
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+}
+
+.liquid-glass-dark {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.liquid-glass.chat-container {
+  min-height: auto;
+  height: auto;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.glass-content {
+  position: relative;
+  z-index: 1;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.draggable-area {
+  -webkit-app-region: drag;
+  height: 32px;
+  width: 100%;
+  cursor: move;
+  position: relative;
+  z-index: 1000;
+  border-radius: 1rem 1rem 0 0;
+}
+
+.liquid-glass-bar.draggable-area {
+  -webkit-app-region: drag;
+  cursor: move;
+}
+
+.liquid-glass-bar.draggable-area button,
+.liquid-glass-bar.draggable-area input,
+.liquid-glass-bar.draggable-area select {
+  -webkit-app-region: no-drag;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-@layer base {
-  :root {
-    --radius: 0.5rem;
-  }
+.animate-pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }

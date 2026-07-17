@@ -1,0 +1,20 @@
+[project]
+name = "openpen-backend"
+version = "0.1.0"
+description = "OpenPen AI backend with Groq"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "python-socketio",
+    "python-dotenv",
+    "groq",
+    "numpy",
+]
+
+[project.scripts]
+openpen-server = "main:main"
+
+[tool.uv]
+package = true

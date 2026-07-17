@@ -1,13 +1,16 @@
 {
-  "name": "frontend",
+  "name": "openpen",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "electron:dev": "bash scripts/dev.sh",
+    "electron:build": "vite build && bun electron .",
+    "preview": "vite preview",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-scroll-area": "^1.2.2",
@@ -16,6 +19,7 @@
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.473.0",
     "path": "^0.12.7",
     "react": "^18.3.1",
@@ -31,6 +35,7 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "electron": "^43.1.1",
     "eslint": "^9.17.0",
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",

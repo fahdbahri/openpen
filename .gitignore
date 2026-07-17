@@ -172,3 +172,5 @@ cython_debug/
 
 # Paths
 src/backend/settings.py
+.nvimlog
+src/backend/.nvimlog

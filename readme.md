@@ -1,33 +1,62 @@
-# AI Notetaker
+# OpenPen
 
-A real-time speech-to-text transcription and summarization tool that converts spoken words into organized notes.
+AI-powered lecture/meeting assistant with live transcription, smart notes, and chat, all in an overlay window.
 
 ## Features
 
-- 🎙️ Real-time audio transcription using Google Cloud Speech-to-Text
-- 📝 Automatic summarization using Facebook's BART model
-- 🖥️ React frontend with Vite for fast development
-- ⚡ FastAPI backend for efficient processing
-- 📱 Responsive UI with Tailwind CSS
+- 🎙️ **Live transcription** via Groq Whisper (mic only)
+- 🤖 **AI Chat** with full lecture context (Summarize, Explain, Quiz, Key Points)
+- 📝 **Rich notes editor** (Bold / Italic)
+- 📄 **PDF export** — transcription, notes, and chat history
+- 🔝 **Always-on-top overlay** — thin 32px bar, dropdown panels
+- ⚡ Fast Python backend (Groq LLM + Whisper)
 
-## How It Works
+## Quick Start
 
-1. **Audio Capture**: Frontend captures microphone input using Web Audio API
-2. **Stream Processing**: Audio chunks are sent to backend via Socket.IO
-3. **Transcription**: Google Cloud Speech-to-Text converts speech to text
-4. **Summarization**: BART model generates concise bullet-point notes
-5. **Display**: Results shown in a tabbed interface (live captions/summary)
+**Prerequisites:** [Docker](https://docs.docker.com/engine/install/), [Git](https://git-scm.com/), and [Bun](https://bun.sh/) (for Electron on the host).
+
+```bash
+# 1. Clone
+git clone <repo-url> && cd openpen
+
+# 2. Set your Groq API key. Visit https://groq.com to get a free api key.
+echo "GROQ_API_KEY=gsk_..." > src/backend/.env
+
+# 3. Start backend + Vite dev server
+docker compose up -d
+
+# 4. Launch Electron overlay (on host, needs Bun)
+cd src/frontend && bun install && bun electron .
+```
+
+The overlay appears top-right. Start recording with the mic button.
+
+## Project Structure
+
+```
+openpen/
+├── docker-compose.yml
+├── src/
+│   ├── backend/           # Python FastAPI server (Groq STT + LLM)
+│   │   ├── main.py
+│   │   ├── Dockerfile
+│   │   ├── pyproject.toml
+│   │   └── .env
+│   └── frontend/          # React + Electron overlay
+│       ├── src/
+│       │   ├── components/
+│       │   │   └── AudioRecorder.jsx   # Main bar + panels
+│       │   └── TranscribeUtilities.js  # Socket.IO mic streaming
+│       ├── electron/
+│       │   ├── main.cjs    # Electron window config
+│       │   └── preload.cjs # IPC bridge
+│       ├── package.json
+│       └── Dockerfile
+```
 
 ## Tech Stack
 
-### Frontend
-- React
-- Socket.IO client
-- Web Audio API
-
-### Backend
-- FastAPI
-- Google Cloud Speech-to-Text
-- HuggingFace Transformers (BART model)
-- Socket.IO server
-- Uvicorn ASGI server
+- **Frontend:** React, Vite, Tailwind CSS, Socket.IO client, jsPDF, Lucide icons
+- **Desktop:** Electron (transparent, frameless, always-on-top)
+- **Backend:** Python, FastAPI, Groq (Whisper + Llama), Socket.IO, Uvicorn
+- **Infra:** Docker / Docker Compose
