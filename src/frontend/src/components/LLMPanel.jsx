@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-export function LLMPanel({ messages, onSendMessage, onSummarize, transcription, notes }) {
+export function LLMPanel({ messages, onSendMessage, onSummarize, transcription }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef(null);
 

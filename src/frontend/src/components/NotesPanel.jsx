@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export function NotesPanel({ notes, onNotesChange, onAskLLM, onEditByLLM }) {
+export function NotesPanel({ notes, onNotesChange, onEditByLLM }) {
   const [editInstruction, setEditInstruction] = useState("");
 
   const handleEdit = () => {

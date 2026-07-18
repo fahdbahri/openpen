@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import AudioRecorder from './components/AudioRecorder'
+import StatusBar from './components/StatusBar'
 
 export default function App() {
   const containerRef = useRef(null)
@@ -22,7 +22,7 @@ export default function App() {
 
   return (
     <div ref={containerRef} className="min-h-0 select-none">
-      <AudioRecorder />
+      <StatusBar />
     </div>
   )
 }

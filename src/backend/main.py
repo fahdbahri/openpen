@@ -2,6 +2,7 @@ import os
 import io
 import struct
 import time
+import json
 import queue
 import asyncio
 import threading
@@ -16,9 +17,20 @@ from groq import Groq
 load_dotenv()
 
 groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "whisper-large-v3-turbo")
+
+LLM_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+]
+
+STT_MODELS = [
+    "whisper-large-v3-turbo",
+    "whisper-large-v3",
+]
 
 app = FastAPI()
 
@@ -51,6 +63,14 @@ class LLMEditNotesRequest(BaseModel):
     instruction: str
     current_notes: str
     transcription: Optional[str] = ""
+    # NEW: pass prior turns so the assistant can hold a real back-and-forth
+    history: Optional[List[dict]] = []
+
+
+class SettingsRequest(BaseModel):
+    api_key: str
+    llm_model: str
+    whisper_model: Optional[str] = "whisper-large-v3-turbo"
 
 
 def pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000) -> bytes:
@@ -61,19 +81,19 @@ def pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000) -> bytes:
     total_size = header_size + data_size
 
     buf = io.BytesIO()
-    buf.write(b'RIFF')
-    buf.write(struct.pack('<I', total_size - 8))
-    buf.write(b'WAVE')
-    buf.write(b'fmt ')
-    buf.write(struct.pack('<I', 16))
-    buf.write(struct.pack('<H', 1))
-    buf.write(struct.pack('<H', num_channels))
-    buf.write(struct.pack('<I', sample_rate))
-    buf.write(struct.pack('<I', sample_rate * num_channels * bits_per_sample // 8))
-    buf.write(struct.pack('<H', num_channels * bits_per_sample // 8))
-    buf.write(struct.pack('<H', bits_per_sample))
-    buf.write(b'data')
-    buf.write(struct.pack('<I', data_size))
+    buf.write(b"RIFF")
+    buf.write(struct.pack("<I", total_size - 8))
+    buf.write(b"WAVE")
+    buf.write(b"fmt ")
+    buf.write(struct.pack("<I", 16))
+    buf.write(struct.pack("<H", 1))
+    buf.write(struct.pack("<H", num_channels))
+    buf.write(struct.pack("<I", sample_rate))
+    buf.write(struct.pack("<I", sample_rate * num_channels * bits_per_sample // 8))
+    buf.write(struct.pack("<H", num_channels * bits_per_sample // 8))
+    buf.write(struct.pack("<H", bits_per_sample))
+    buf.write(b"data")
+    buf.write(struct.pack("<I", data_size))
     buf.write(pcm_data)
     return buf.getvalue()
 
@@ -108,9 +128,7 @@ class ClientData:
             return data
 
     def _emit(self, event, data):
-        asyncio.run_coroutine_threadsafe(
-            self.conn.emit(event, data), self.loop
-        )
+        asyncio.run_coroutine_threadsafe(self.conn.emit(event, data), self.loop)
 
     def _transcribe_loop(self):
         while self.is_recording:
@@ -172,10 +190,18 @@ async def end_stream(sid):
         clients[sid].stop_transcription()
 
 
-def query_llm(prompt: str, notes: str = "", transcription: str = "", history: Optional[List[dict]] = None) -> str:
+def query_llm(
+    prompt: str,
+    notes: str = "",
+    transcription: str = "",
+    history: Optional[List[dict]] = None,
+    max_tokens: int = 800,
+) -> str:
     context_parts = []
     if transcription:
-        context_parts.append(f"Current transcription (lecture/meeting audio):\n{transcription}")
+        context_parts.append(
+            f"Current transcription (lecture/meeting audio):\n{transcription}"
+        )
     if notes:
         context_parts.append(f"User's notes:\n{notes}")
 
@@ -183,14 +209,16 @@ def query_llm(prompt: str, notes: str = "", transcription: str = "", history: Op
     if context_parts:
         context = "Context:\n" + "\n\n".join(context_parts) + "\n\n"
 
-    messages = [{
-        "role": "system",
-        "content": (
-            "You are an AI assistant that helps with note-taking, transcription analysis, "
-            "and explanation. You have access to the user's notes and the live transcription "
-            "of their lecture or meeting. Answer helpfully and concisely."
-        )
-    }]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI assistant that helps with note-taking, transcription analysis, "
+                "and explanation. You have access to the user's notes and the live transcription "
+                "of their lecture or meeting. Answer helpfully and concisely."
+            ),
+        }
+    ]
 
     if context:
         messages.append({"role": "system", "content": context})
@@ -205,7 +233,7 @@ def query_llm(prompt: str, notes: str = "", transcription: str = "", history: Op
         response = groq.chat.completions.create(
             model=LLM_MODEL,
             messages=messages,
-            max_tokens=800,
+            max_tokens=max_tokens,
             temperature=0.7,
         )
         return response.choices[0].message.content
@@ -213,17 +241,175 @@ def query_llm(prompt: str, notes: str = "", transcription: str = "", history: Op
         return f"Error: {str(e)}"
 
 
-def edit_notes_with_llm(instruction: str, current_notes: str, transcription: str = "") -> str:
-    prompt = f"""Edit the user's notes based on their instruction.
+# ---------------------------------------------------------------------------
+# Notes assistant: tool-calling based intent routing (replaces keyword guess)
+# ---------------------------------------------------------------------------
+#
+# Instead of sniffing the instruction text for words like "explain" or "quiz"
+# to decide whether to edit notes or answer a question, we let the model
+# itself choose by calling one of two tools. This is far more reliable than
+# keyword matching (e.g. "add a section explaining the recursion part" used
+# to get misrouted as a pure question because it contains "explaining"), and
+# it means the model's own understanding of the request drives the branch,
+# not a brittle heuristic.
+#
+# We also thread conversation history through, so follow-ups like
+# "actually make that shorter" or "no, I meant the second bullet" have the
+# context of what was just discussed, instead of every call starting cold.
 
-Current notes:
-{current_notes}
+NOTES_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_notes",
+            "description": (
+                "Rewrite the user's notes to apply the requested change. Use this whenever "
+                "the user wants their notes added to, trimmed, reorganized, reformatted, "
+                "corrected, or otherwise modified."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "updated_notes": {
+                        "type": "string",
+                        "description": (
+                            "The complete, updated notes in HTML (use <h2>/<h3>, <ul>/<li>, "
+                            "<b>, <i>, <pre><code> for code). Return the FULL notes, not a diff."
+                        ),
+                    },
+                    "summary_of_changes": {
+                        "type": "string",
+                        "description": "1-2 sentence, specific summary of what changed and why.",
+                    },
+                },
+                "required": ["updated_notes", "summary_of_changes"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "answer_question",
+            "description": (
+                "Reply conversationally without changing the notes. Use this for questions, "
+                "explanations, quizzes, clarifications, or anything that isn't a request to "
+                "modify the notes."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "answer": {
+                        "type": "string",
+                        "description": "HTML-formatted answer (<b>, <ul><li>, <h3> as needed).",
+                    },
+                },
+                "required": ["answer"],
+            },
+        },
+    },
+]
 
-Instruction: {instruction}
 
-Return the edited or updated notes. Preserve content that should not change. Only return the notes."""
+def edit_notes_with_llm(
+    instruction: str,
+    current_notes: str,
+    transcription: str = "",
+    history: Optional[List[dict]] = None,
+) -> dict:
+    context = f"\nTranscription for reference:\n{transcription}\n" if transcription else ""
 
-    return query_llm(prompt, notes=current_notes, transcription=transcription)
+    system_prompt = (
+        "You are NotesGPT, an assistant that both edits a user's running notes and answers "
+        "questions about them, within one ongoing conversation. You must always call exactly "
+        "one of the two available tools:\n"
+        "- Call edit_notes when the user is asking you to change the notes in any way.\n"
+        "- Call answer_question for everything else (questions, explanations, quizzes, chat).\n\n"
+        "Use the full conversation history to understand follow-ups (e.g. 'shorter', 'no, the "
+        "other section', 'add an example there') — resolve pronouns and vague references "
+        "against what was just discussed, don't ask the user to repeat themselves.\n\n"
+        "When editing notes: base them strictly on the provided notes/transcription plus the "
+        "user's instruction, don't invent outside facts, and keep formatting consistent "
+        "(HTML with <h2>/<h3>, <ul><li>, <b>, <i>, <pre><code> for code/commands).\n"
+        "When answering: be direct and specific to what was actually asked; don't pad with "
+        "boilerplate like 'Notes updated' since notes were not touched."
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if history:
+        # keep enough turns for real context without blowing the context window
+        messages.extend(history[-12:])
+
+    user_content = f"Current notes:\n{current_notes}\n{context}\nInstruction: {instruction}"
+    messages.append({"role": "user", "content": user_content})
+
+    try:
+        response = groq.chat.completions.create(
+            model=LLM_MODEL,
+            messages=messages,
+            tools=NOTES_TOOLS,
+            tool_choice="required",
+            max_tokens=3000,
+            temperature=0.5,
+        )
+    except Exception as e:
+        return {
+            "notes": current_notes,
+            "explanation": f"Sorry, I hit an error: {str(e)}",
+            "is_question": False,
+        }
+
+    message = response.choices[0].message
+    tool_calls = message.tool_calls or []
+
+    if not tool_calls:
+        # Model ignored tool_choice (rare) — fall back to treating raw content as an answer
+        return {
+            "notes": current_notes,
+            "explanation": message.content or "I didn't quite catch that — could you rephrase?",
+            "is_question": True,
+        }
+
+    call = tool_calls[0]
+    try:
+        args = json.loads(call.function.arguments)
+    except (json.JSONDecodeError, TypeError):
+        args = {}
+
+    if call.function.name == "edit_notes":
+        updated_notes = args.get("updated_notes") or current_notes
+        explanation = args.get("summary_of_changes") or "Notes updated."
+        return {"notes": updated_notes, "explanation": explanation, "is_question": False}
+
+    # answer_question (or anything unrecognized falls back to Q&A behavior)
+    answer = args.get("answer") or "I'm not sure how to respond to that — could you rephrase?"
+    return {"notes": current_notes, "explanation": answer, "is_question": True}
+
+
+@app.post("/llm/edit-notes")
+async def llm_edit_notes(request: LLMEditNotesRequest):
+    try:
+        edited = edit_notes_with_llm(
+            instruction=request.instruction,
+            current_notes=request.current_notes,
+            transcription=request.transcription,
+            history=request.history,
+        )
+
+        return {
+            "status": "success",
+            "notes": edited.get("notes", request.current_notes),
+            "explanation": edited.get("explanation", ""),
+            "is_question": edited.get("is_question", False),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "notes": request.current_notes,
+            "explanation": "",
+            "error": str(e),
+            "is_question": False,
+        }
 
 
 @app.post("/summary")
@@ -270,21 +456,33 @@ async def llm_chat(request: LLMQueryRequest):
         return {"status": "error", "response": f"Error: {str(e)}"}
 
 
-@app.post("/llm/edit-notes")
-async def llm_edit_notes(request: LLMEditNotesRequest):
+@app.post("/settings")
+async def update_settings(request: SettingsRequest):
+    global groq, LLM_MODEL, WHISPER_MODEL
     try:
-        edited = edit_notes_with_llm(
-            instruction=request.instruction,
-            current_notes=request.current_notes,
-            transcription=request.transcription,
-        )
-        return {"status": "success", "notes": edited}
-    except Exception as e:
+        groq = Groq(api_key=request.api_key)
+        if request.llm_model in LLM_MODELS:
+            LLM_MODEL = request.llm_model
+        if request.whisper_model in STT_MODELS:
+            WHISPER_MODEL = request.whisper_model
         return {
-            "status": "error",
-            "notes": request.current_notes,
-            "error": str(e),
+            "status": "success",
+            "llm_model": LLM_MODEL,
+            "whisper_model": WHISPER_MODEL,
         }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/settings")
+async def get_settings():
+    return {
+        "llm_model": LLM_MODEL,
+        "available_llm_models": LLM_MODELS,
+        "whisper_model": WHISPER_MODEL,
+        "available_stt_models": STT_MODELS,
+        "has_api_key": groq.api_key is not None,
+    }
 
 
 @app.get("/health")
@@ -294,6 +492,7 @@ async def health_check():
 
 def main():
     import uvicorn
+
     uvicorn.run(socket_app, host="0.0.0.0", port=10000)
 
 

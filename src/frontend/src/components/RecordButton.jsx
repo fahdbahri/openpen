@@ -8,7 +8,6 @@ export function RecordButton({
   onInterimUpdate,
   onRecordingStateChange,
   onSummarize,
-  getFullTranscript,
 }) {
   const [isRecording, setIsRecording] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
