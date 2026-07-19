@@ -224,7 +224,7 @@ export default function StatusBar() {
     };
 
     doc.setFontSize(18);
-    doc.text("OpenPen - Lecture Notes", 14, y);
+    doc.text("Lecture Notes", 14, y);
     y += 10;
     doc.setFontSize(9);
     doc.text(`Generated: ${dateStr}`, 14, y);
@@ -303,7 +303,7 @@ export default function StatusBar() {
             {chatMessages.length === 0 ? (
               <div className="text-center text-white/30 text-[11px] pt-4">
                 <MessageSquare size={24} className="mx-auto mb-2 opacity-40" />
-                <p>Ask about the lecture or use quick actions below</p>
+                <p>Ask a question to get started</p>
               </div>
             ) : (
               chatMessages.map((msg, i) => (
