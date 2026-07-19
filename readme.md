@@ -7,9 +7,8 @@ AI-powered lecture/meeting assistant with live transcription, smart notes, and c
 - **Live transcription** via Groq Whisper (mic only)
 - **AI Chat** with full lecture context (Summarize, Explain, Quiz, Key Points)
 - **PDF export**: transcription, notes, and chat history
-- Fast Python backend (Groq LLM + Whisper)
 
-## Quick Start
+## Installation
 
 Groq provides free LLms usage, you can get your API keys in [here](https://console.groq.com)
 
@@ -25,8 +24,6 @@ The script will:
 3. Install all dependencies
 4. Start the backend + frontend dev server
 5. Launch the Electron overlay
-
-The overlay appears top-right. Start recording with the mic button.
 
 ## Project Structure
 
@@ -53,4 +50,4 @@ openpen/
 
 - **Frontend:** React, Vite, Tailwind CSS, Socket.IO, jsPDF, Lucide
 - **Desktop:** Electron (transparent, frameless, always-on-top)
-- **Backend:** Python, FastAPI, Groq (Whisper + Llama), Socket.IO, Uvicorn
+- **Backend:** Python, FastAPI, Groq LLM, Socket.IO, Uvicorn
