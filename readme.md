@@ -6,12 +6,12 @@ AI-powered lecture/meeting assistant with live transcription, smart notes, and c
 
 - **Live transcription** via Groq Whisper (mic only)
 - **AI Chat** with full lecture context (Summarize, Explain, Quiz, Key Points)
-- **Rich notes editor** (Bold / Italic)
-- **PDF export** — transcription, notes, and chat history
-- **Always-on-top overlay** — thin 32px bar, dropdown panels
+- **PDF export**: transcription, notes, and chat history
 - Fast Python backend (Groq LLM + Whisper)
 
 ## Quick Start
+
+Groq provides free LLms usage, you can get your API keys in [here](https://console.groq.com)
 
 ```bash
 git clone <repo-url> && cd openpen
@@ -21,7 +21,7 @@ git clone <repo-url> && cd openpen
 The script will:
 
 1. Install **Bun** and **uv** if missing
-2. Prompt for your Groq API key (get one free at https://console.groq.com)
+2. Prompt for your Groq API key. [Get one free](https://console.groq.com)
 3. Install all dependencies
 4. Start the backend + frontend dev server
 5. Launch the Electron overlay
